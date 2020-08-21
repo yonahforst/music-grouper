@@ -1,0 +1,11 @@
+{
+  "spotify": {
+    "clientId":"xxxxx", 
+    "clientSecret":"xxxxx",
+    "redirectUri": "xxxxx",
+    "playlistId": "xxxxxx"
+  },
+  "whatsapp": {
+    "groupId": "xxxxx"
+  }
+}

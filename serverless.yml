@@ -1,0 +1,74 @@
+service: music-grouper
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  stage: dev
+  region: eu-west-1
+  timeout: 15
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:GetItem"
+        - "dynamodb:PutItem"
+        - "dynamodb:UpdateItem"
+        - "dynamodb:DeleteItem"
+        - "dynamodb:Query"
+        - "dynamodb:BatchWriteItem"
+      Resource:
+        - "arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/${self:custom.dynamodbTableName}*"
+    - Effect: "Allow"
+      Action:
+        - "ssm:GetParameter"
+        - "ssm:PutParameter"
+      Resource:
+        - "arn:aws:ssm:#{AWS::Region}:#{AWS::AccountId}:parameter/${self:service}/*"
+  environment:
+    DYNAMODB_TABLE_NAME: ${self:custom.dynamodbTableName}
+    APP_NAME: ${self:service}
+
+custom: 
+  dynamodbTableName: music-grouper-entries
+
+functions:
+  fetchMessagesCron:
+    handler: handler.fetchMessagesCron
+    events:
+      - schedule: rate(1 hour)
+  oauthWebhook:
+    handler: handler.oauthWebhook
+    events:
+      - http: 
+          method: ANY
+          path: v1/oauth/{serviceName}
+  parseNewRecord:
+    handler: handler.parseNewRecord
+    events:
+      - stream:
+          type: dynamodb
+          startingPosition: TRIM_HORIZON
+          arn: !GetAtt EntriesTable.StreamArn
+
+resources:
+ Resources:
+  EntriesTable:
+    Type: 'AWS::DynamoDB::Table'
+    DeletionPolicy: Retain
+    Properties:
+      AttributeDefinitions:
+        -
+          AttributeName: id
+          AttributeType: S
+      KeySchema:
+        -
+          AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 4
+        WriteCapacityUnits: 4
+      TableName: ${self:custom.dynamodbTableName}
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+
+plugins:
+  - serverless-pseudo-parameters        
