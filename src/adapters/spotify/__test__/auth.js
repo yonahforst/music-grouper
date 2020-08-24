@@ -41,15 +41,14 @@ const auth = proxyquire('../auth', {
   }
 })
 
-test('createAuthorizeURL', assert => {
+test('generateLogin', assert => {
   const expected = 'http://some.url?playlist-modify-public+playlist-modify-private'
-  const result = auth.createAuthorizeURL()
+  const result = auth.generateLogin()
   assert.deepEqual(result, expected, 'returns an oauth url')
   assert.end()
 })
 
 test('handleAuthResponse', async assert => {
-  
   const expected = {
     accessToken: 'access-token-foo',
     refreshToken: 'refresh-token-foo',

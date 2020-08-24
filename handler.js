@@ -1,7 +1,8 @@
 const {
   fetchLatestMessages,
   handleAuthResponse,
-  addTrack
+  addTrack,
+  login,
 } = require('./src')
 
 const parseStreamEvent = require('./src/lib/parseStreamEvent')
@@ -25,4 +26,16 @@ module.exports.parseNewRecord = async ({
     const track = parseStreamEvent(record)
     await addTrack(track)
   }
+}
+
+// use the old style callback to prevent lambda from closing 
+// as soon as a promise is returned. This way it says open until
+// the event loop is empty
+module.exports.loginToServices = ({
+  serviceNames,
+}, context, callback) => {
+  for (const serviceName of serviceNames) {
+    login(serviceName)
+  }
+  callback()
 }

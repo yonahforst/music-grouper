@@ -23,14 +23,25 @@ provider:
         - "ssm:PutParameter"
       Resource:
         - "arn:aws:ssm:#{AWS::Region}:#{AWS::AccountId}:parameter/${self:service}/*"
+    - Effect: "Allow"
+      Action:
+        - "SNS:Publish"
+      Resource:
+        - "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.loginSnsTopic}"    
+      
   environment:
     DYNAMODB_TABLE_NAME: ${self:custom.dynamodbTableName}
+    LOGIN_SNS_TOPIC_ARN: !Ref LoginTopic
     APP_NAME: ${self:service}
 
 custom: 
-  dynamodbTableName: music-grouper-entries
+  dynamodbTableName: ${self:service}-entries
+  loginSnsTopic: ${self:service}-service-login
 
 functions:
+  loginToServices:
+    handler: handler.loginToServices
+    timeout: 60
   fetchMessagesCron:
     handler: handler.fetchMessagesCron
     events:
@@ -51,6 +62,16 @@ functions:
 
 resources:
  Resources:
+  LoginTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ${self:custom.loginSnsTopic}
+  LoginSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: ${file(config.json):snsSubscription.email}
+      Protocol: email
+      TopicArn: !Ref LoginTopic
   EntriesTable:
     Type: 'AWS::DynamoDB::Table'
     DeletionPolicy: Retain

@@ -6,6 +6,15 @@ const {
   setMeta,
 } = require('./lib/storage')
 
+const {
+  publish,
+} = require('./lib/notify')
+
+const {
+  appName,
+  loginSnsTopic,
+} = require('./lib/env')
+
 const adapters = require('./adapters')
 
 const parseWhatsAppMessages = require('./lib/parseWhatsAppMessages')
@@ -74,4 +83,15 @@ module.exports.addTrack = async (track) => {
   await service.addTrack(sanitizedUrl)
 
   return true
+}
+
+module.exports.login = async (serviceName) => {
+  const service = adapters[serviceName]
+
+  if (!service)
+    throw new Error('unknownService: ' + serviceName)
+  
+  const body = await service.generateLogin()
+
+  await publish(`${appName} wants you to login to ${serviceName}:\n${body}`)
 }

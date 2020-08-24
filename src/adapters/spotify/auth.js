@@ -5,7 +5,7 @@ const CREDENTIALS_KEY = 'accessToken/spotify'
 
 const scopes = ['playlist-modify-public', 'playlist-modify-private']
 
-module.exports.createAuthorizeURL = () => client.createAuthorizeURL(scopes)
+module.exports.generateLogin = () => client.createAuthorizeURL(scopes)
 
 module.exports.handleAuthResponse = async ({ code }) => {
   const { body } = await client.authorizationCodeGrant(code)
