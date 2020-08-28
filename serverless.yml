@@ -52,12 +52,11 @@ functions:
       - http: 
           method: ANY
           path: v1/oauth/{serviceName}
-  parseNewRecord:
-    handler: handler.parseNewRecord
+  processNewRecord:
+    handler: handler.processNewRecord
     events:
       - stream:
           type: dynamodb
-          startingPosition: TRIM_HORIZON
           arn: !GetAtt EntriesTable.StreamArn
 
 resources:

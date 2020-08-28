@@ -19,7 +19,7 @@ module.exports.oauthWebhook = async ({
   })
 }
 
-module.exports.parseNewRecord = async ({
+module.exports.processNewRecord = async ({
   Records
 }) => {
   for (const record of Records) {
