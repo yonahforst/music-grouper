@@ -12,7 +12,6 @@ const {
 
 const {
   appName,
-  loginSnsTopic,
 } = require('./lib/env')
 
 const adapters = require('./adapters')
@@ -64,24 +63,40 @@ module.exports.handleAuthResponse = async ({
   return true
 }
 
-module.exports.addTrack = async (track) => {
-  console.log('WILL ADD TRACK', track)
-
-  if (!track.url)
+module.exports.addTrack = async ({ url }) => {
+  console.log('WILL ADD URL', url)
+  const { spotify } = adapters
+  if (!url)
     return
 
-  const serviceName = getServiceNameFromUrl(track.url)
+  // try to load an adapter for this service. If we can't then quit  
+  const serviceName = getServiceNameFromUrl(url)
   const service = adapters[serviceName]
-
   if (!service)
-    return false
+    return
 
-  if (service.init)
-    await service.init()
+  await spotify.init()
 
-  const sanitizedUrl = track.url.replace(/^[\s.]+|[\s.]+$/g,"");
-  await service.addTrack(sanitizedUrl)
+  // remove trailing and leading periods and spaces
+  const sanitizedUrl = url.replace(/^[\s.]+|[\s.]+$/g,"");
 
+  // if this is a spotify url, we can add it directly
+  if (serviceName === 'spotify') {
+    await spotify.addTrack(sanitizedUrl)
+    return true
+  }
+
+  // try to get the track artist and title. If we can't then quit
+  const trackInfo = await service.getDetailsFromUrl(sanitizedUrl).catch(console.warn)
+  if (!trackInfo)
+    return
+
+  // try to find this track on spotify. If we can't then quit
+  const spotifyTrack = await spotify.findTrack(trackInfo)
+  if (!spotifyTrack)
+    return
+
+  await spotify.addTrack(spotifyTrack.uri)
   return true
 }
 

@@ -1,11 +1,11 @@
 const { test, beforeEach } = require('tap')
 const proxyquire = require('proxyquire')
 
-
 let authResponse
 let trackAdded
 let didInit 
 let meta
+let didPublish
 let items = []
 
 beforeEach(done => {
@@ -13,6 +13,7 @@ beforeEach(done => {
   trackAdded = null
   didInit = null
   meta = null
+  didPublish = null
   items = []
   done()
 })
@@ -20,7 +21,8 @@ beforeEach(done => {
 const index = proxyquire('../index', {
   './adapters': {
     whatsapp: {
-      init: () => didInit = 'whatsapp',
+      init: async () => didInit = 'whatsapp',
+      generateLogin: async () => 'whatsappLogin',
       getGroupMessages: ({ paginationToken }) => [{
         messages: [ 'message1', 'message2' ],
         nextPaginationToken: paginationToken + 1,
@@ -30,17 +32,51 @@ const index = proxyquire('../index', {
       }]
     },
     spotify: {
-      init: () => didInit = 'spotify',
-      handleAuthResponse: response => authResponse = response,
-      addTrack: uri => trackAdded = { uri }
+      init: async () => didInit = 'spotify',
+      handleAuthResponse: async response => authResponse = response,
+      addTrack: async uri => trackAdded = { uri },
+      generateLogin: async () => 'spotifyLogin',
+      findTrack: async track => {
+        if (track.title.includes('unknown'))
+          return
+
+        return { uri: JSON.stringify(track) }
+      }
+    },
+    bandcamp: {
+      getDetailsFromUrl: async url => ({
+        artist: 'bandcamp',
+        title: url,
+      })
+    },
+    soundcloud: {
+      getDetailsFromUrl: async url => ({
+        artist: 'soundcloud',
+        title: url,
+      })
+    },
+    youtube: {
+      getDetailsFromUrl: async url => ({
+        artist: 'youtube',
+        title: url,
+      })
+    },
+    'throwerror.com': {
+      getDetailsFromUrl: async () => { throw 'some-error' }
     }
   },
   './lib/storage': {
-    batchSet: i => items.push(...i),
-    getMeta: () => meta,
-    setMeta: m => meta = m,
+    batchSet: async i => items.push(...i),
+    getMeta: async () => meta,
+    setMeta: async m => meta = m,
   },
   './lib/parseWhatsAppMessages': messages => messages,
+  './lib/notify': {
+    publish: str => didPublish = str
+  },
+  './lib/env': {
+    appName: 'fooApp'
+  },
 })
 
 
@@ -72,8 +108,22 @@ test('handleAuthResponse', async assert => {
   )
 })
 
+test('login - spotify', async assert => {
+  const expected = 'fooApp wants you to login to spotify:\nspotifyLogin'
+  await index.login('spotify')
 
-test('addTrack', async assert => {
+  assert.equals(didPublish, expected, 'publishes login notification')
+})
+
+test('login - whatsapp', async assert => {
+  const expected = 'fooApp wants you to login to whatsapp:\nwhatsappLogin'
+  await index.login('whatsapp')
+
+  assert.equals(didPublish, expected, 'publishes login notification')
+})
+
+
+test('addTrack - spotify', async assert => {
 
   const expected = { uri: 'http://spotify.com/some-track' }
 
@@ -82,5 +132,66 @@ test('addTrack', async assert => {
   })
 
   assert.equals(didInit, 'spotify', 'didInit')
-  assert.deepEquals(trackAdded, expected, 'adds track to to correct service')
+  assert.deepEquals(trackAdded, expected, 'adds track to spotify')
+})
+
+test('addTrack - bandcamp', async assert => {
+  const expected = { uri: '{"artist":"bandcamp","title":"http://bandcamp.com/some-track"}' }
+
+  await index.addTrack({ 
+    url: 'http://bandcamp.com/some-track .' // should sanitize the url
+  })
+
+  assert.equals(didInit, 'spotify', 'didInit')
+  assert.deepEquals(trackAdded, expected, 'adds track to spotify')
+})
+
+test('addTrack - soundcloud', async assert => {
+  const expected = { uri: '{"artist":"soundcloud","title":"http://soundcloud.com/some-track"}' }
+
+  await index.addTrack({ 
+    url: 'http://soundcloud.com/some-track .' // should sanitize the url
+  })
+
+  assert.equals(didInit, 'spotify', 'didInit')
+  assert.deepEquals(trackAdded, expected, 'adds track to spotify')
+})
+
+
+test('addTrack - youtube', async assert => {
+  const expected = { uri: '{"artist":"youtube","title":"http://youtube.com/some-track"}' }
+
+  await index.addTrack({ 
+    url: 'http://youtube.com/some-track .' // should sanitize the url
+  })
+
+  assert.equals(didInit, 'spotify', 'didInit')
+  assert.deepEquals(trackAdded, expected, 'adds track to spotify')
+})
+
+test('addTrack - unknown', async assert => {
+  await index.addTrack({ 
+    url: 'http://unknown.com/some-track'
+  })
+
+  assert.equal(didInit, null, 'does not init spotify')
+  assert.equals(trackAdded, null, 'does not add track to spotify')
+})
+
+test('addTrack - error getting title', async assert => {
+  await index.addTrack({ 
+    url: 'http://throwerror.com/some-track'
+  })
+
+  assert.equals(didInit, 'spotify', 'didInit')
+  assert.equals(trackAdded, null, 'does not add track to spotify')
+})
+
+test('addTrack - missing on spotify', async assert => {
+  await index.addTrack({ 
+    url: 'http://youtube.com/unknown-track .' // should sanitize the url
+  })
+
+  assert.equals(didInit, 'spotify', 'didInit')
+  assert.equals(trackAdded, null, 'does not add track to spotify')
 })
