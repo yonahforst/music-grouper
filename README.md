@@ -34,4 +34,18 @@ Steps:
 That's it!
 
 ### Architecture
--- coming soon ---
+
+#### Login
+For the moment you only need to login to two services, whatsapp and spotify. We use SNS to email you the 'login challenges' (that's not the right term). For spotify it's an oauth url. When you login using that url, we receive a callback on our webhook with credentials. Those are stored in AWS's Parameter Store and refreshed automatically as needed. For whatsapp it's a QR code which you need to scan with your phone. The connection to whatsapp needs to stay open until the user scans the QR code, so we have an extra long timeout on this lambda function. Once scanned, we store the credentials in the same way.
+
+#### Fetching messages
+We read messages from whatsapp chronologically in groups of 25. Each time read, we store the last message in dynamodb as a pagination cursor so that next time we can start from there. For each group, we parse the messages looking for any kind of url and if found, we write them to dynamodb, one record for each url. We also save the source message as metadata because why not.
+
+#### Processing new records
+We use dynamodb streams as a message queue. For each record take the following steps:
+- look at the url to host to determine the source. If it's something we don't recognize (not spotify, bandcamp, etc..) then ignore it.
+- if the url is from spotify, we add it directly to the playlist. (right now it only handles links to albums and tracks. If it's an album, we add all the tracks)
+- if the url is from another service, we try to parse the artist and title using a scraper for that service.
+- We then search spotify for that artist and title and add the first track result to our playlist.
+
+These last two steps are tricky and error prone. The scrapers aren't 100% reliable and dont always extract good info. The tracks aren't always available on spotify or if the titles don't match exactly, they aren't found. So this algorithm needs some work still. Also, it only handles tracks from other services, but what if someone shares a bandcamp album? should it add the entire thing? I dont know...

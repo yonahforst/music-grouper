@@ -40,7 +40,7 @@ module.exports.fetchLatestMessages = async () => {
   for await (let res of messageGroupIterator) {
     const items = parseWhatsAppMessages(res.messages)
     totalMessages = totalMessages + items.length
-    console.log('GOT NEW ITEMS. NEW TOTAL:', totalMessages)
+    console.log(`GOT ${items.length} NEW ITEMS. (${totalMessages} total)`)
 
     if (items.length > 0)
       await batchSet(items)

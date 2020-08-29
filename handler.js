@@ -30,7 +30,11 @@ module.exports.processNewRecord = async ({
 
 // use the old style callback to prevent lambda from closing 
 // as soon as a promise is returned. This way it says open until
-// the event loop is empty
+// the event loop is empty. We need this because the whatsapp login
+// is async, it requires the user to scan the QR code and only then
+// do we get credentials which we can save. So it's important for
+// the function to stay awake long enough to receive and save those.
+
 module.exports.loginToServices = ({
   serviceNames,
 }, context, callback) => {
